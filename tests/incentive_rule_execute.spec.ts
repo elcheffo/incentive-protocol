@@ -1,33 +1,23 @@
 import { expect, assert } from "chai";
-import PDAUtils from "./utils/pda-utils";
-import { MockRuleExample1 } from "./__mocks__/mock_rule_example_1";
-import { bootstrap } from "./utils/bootstrap";
-import { Incentive } from "../target/types/incentive";
 import { BN } from "bn.js";
 import * as anchor from "@coral-xyz/anchor";
 
+import { bootstrap } from "./utils/bootstrap";
+import {
+  MockRuleExample1,
+  findMockRulePDAs,
+} from "./__mocks__/mock_rule_example_1";
+
 describe("incentive", () => {
   // Bootstrap the test
-  const { admin, confirm, program, provider, generateUsers } =
-    bootstrap<Incentive>("Incentive");
+  const { incentive, admin, confirm, provider, generateUsers } = bootstrap();
 
   const users: anchor.web3.Keypair[] = [];
 
-  // Rule name
-  const ruleName = "timed_rule_v2";
-
-  // Rule PDA (derived from rule name)
-  const [rulePDA] = PDAUtils.findRewardRuleTimedPDAs({
-    name: ruleName,
+  const { mockRuleName, mockRulePDA, mockRewardStatePDA } = findMockRulePDAs({
+    name: "timed_rule_v2",
     admin: admin.payer.publicKey,
-    programId: program.programId,
-  });
-
-  // Rule state PDA (derived from rule and user)
-  const [rewardStatePDA] = PDAUtils.findRewardStatePDAs({
-    user: admin.payer.publicKey,
-    rule: rulePDA,
-    programId: program.programId,
+    programId: incentive.programId,
   });
 
   before(async () => {
@@ -38,18 +28,18 @@ describe("incentive", () => {
 
   describe("timed rule execute", () => {
     before(async () => {
-      const createSignature = await program.methods
-        .createRewardRule(ruleName)
+      const createSignature = await incentive.methods
+        .createRewardRule(mockRuleName)
         .signers([admin.payer])
         .rpc()
         .then(confirm);
 
       expect(createSignature, "Mock rule creation").to.exist;
 
-      const updateSignature = await program.methods
+      const updateSignature = await incentive.methods
         .updateRewardRule(MockRuleExample1.mockRuleValues)
         .accountsPartial({
-          rule: rulePDA,
+          rule: mockRulePDA,
         })
         .signers([admin.payer])
         .rpc()
@@ -58,12 +48,12 @@ describe("incentive", () => {
     });
 
     it("can start a rule w/ points multiplier", async () => {
-      const signature = await program.methods
+      const signature = await incentive.methods
         .startReward({
           depositAmount: MockRuleExample1.mockDepositAmount,
         })
         .accountsPartial({
-          rule: rulePDA,
+          rule: mockRulePDA,
         })
         .signers([admin.payer])
         .rpc()
@@ -73,7 +63,9 @@ describe("incentive", () => {
 
       // Fetch the latest block time
       const clock = await provider.connection.getSlot();
-      const state = await program.account.ruleTimedState.fetch(rewardStatePDA);
+      const state = await incentive.account.ruleTimedState.fetch(
+        mockRewardStatePDA
+      );
 
       expect(state.lastDepositSlot.toNumber()).to.equal(clock);
       expect(state.lastDepositAmount.toNumber()).to.equal(
@@ -94,13 +86,13 @@ describe("incentive", () => {
         MockRuleExample1.mockRuleValues.penaltyMultiplier
       );
 
-      const signature = await program.methods
+      const signature = await incentive.methods
         .stopReward({
           withdrawAmount: MockRuleExample1.mockWithdrawAmount,
         })
         .accountsPartial({
-          rewardState: rewardStatePDA,
-          rule: rulePDA,
+          rewardState: mockRewardStatePDA,
+          rule: mockRulePDA,
         })
         .signers([admin.payer])
         .rpc()
@@ -108,7 +100,9 @@ describe("incentive", () => {
 
       expect(signature).to.exist;
 
-      const state = await program.account.ruleTimedState.fetch(rewardStatePDA);
+      const state = await incentive.account.ruleTimedState.fetch(
+        mockRewardStatePDA
+      );
       expect(state.lastDepositAmount.toNumber()).to.equal(
         MockRuleExample1.mockDepositAmount.toNumber()
       );
@@ -122,20 +116,21 @@ describe("incentive", () => {
   describe("errors", async () => {
     it("can throw minimum amount unmet error", async () => {
       const user = users.at(0);
-      const [userRewardStatePDA] = PDAUtils.findRewardStatePDAs({
+      const { mockRewardStatePDA: userRewardStatePDA } = findMockRulePDAs({
+        name: mockRuleName,
         user: user.publicKey,
-        rule: rulePDA,
-        programId: program.programId,
+        admin: admin.payer.publicKey,
+        programId: incentive.programId,
       });
       try {
-        await program.methods
+        await incentive.methods
           .startReward({
             depositAmount: new BN(0),
           })
           .accountsPartial({
             user: user.publicKey,
             rewardState: userRewardStatePDA,
-            rule: rulePDA,
+            rule: mockRulePDA,
           })
           .signers([user])
           .rpc()

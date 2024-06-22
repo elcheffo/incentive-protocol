@@ -1,12 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    errors::RewardErrors,
-    states::{RewardRuleTimed, RuleTimedState},
-};
+use crate::states::{RewardRuleTimed, RuleTimedState};
 
 #[derive(Accounts)]
-pub struct StartRewardRule<'info> {
+pub struct InitializeRewardState<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -36,22 +33,14 @@ pub struct StartRewardRule<'info> {
     pub system_program: Program<'info, System>,
 }
 
-impl<'info> StartRewardRule<'info> {
-    pub fn start_reward_rule(&mut self, amount: u64, bumps: &StartRewardRuleBumps) -> Result<()> {
-        require!(
-            self.rule.minimum_amount <= amount,
-            RewardErrors::MinimumAmountUnmet
-        );
-        let clock = Clock::get().unwrap();
-        self.reward_state.last_deposit_slot = clock.slot;
-        self.reward_state.last_deposit_amount = amount;
-        self.reward_state.points = amount * self.rule.points_multiplier;
+impl<'info> InitializeRewardState<'info> {
+    pub fn initialize_reward_state(&mut self, bumps: &InitializeRewardStateBumps) -> Result<()> {
+        self.reward_state.last_deposit_slot = 0;
+        self.reward_state.last_deposit_amount = 0;
+        self.reward_state.last_withdraw_slot = 0;
+        self.reward_state.last_withdraw_amount = 0;
+        self.reward_state.points = 0;
         self.reward_state.bump = bumps.reward_state;
         Ok(())
     }
-}
-
-#[derive(AnchorDeserialize, AnchorSerialize)]
-pub struct StartRewardRuleArgs {
-    pub deposit_amount: u64,
 }

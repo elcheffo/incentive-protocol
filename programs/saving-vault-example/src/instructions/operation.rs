@@ -2,6 +2,12 @@ use anchor_lang::{
     prelude::*,
     system_program::{transfer, Transfer},
 };
+use incentive::{
+    cpi::{accounts::StartRewardRule, start_reward},
+    program::Incentive,
+    states::{RewardRuleTimed, RuleTimedState},
+    StartRewardRuleArgs,
+};
 
 use crate::VaultState;
 
@@ -27,7 +33,16 @@ pub struct VaultUserOperation<'info> {
         bump = vault_state.vault_bump,
     )]
     pub vault: SystemAccount<'info>,
+
     pub system_program: Program<'info, System>,
+
+    // Incentive program integration
+    pub rule: Account<'info, RewardRuleTimed>,
+
+    #[account(mut)]
+    pub reward_state: Account<'info, RuleTimedState>,
+
+    pub incentive_program: Program<'info, Incentive>,
 }
 
 impl<'info> VaultUserOperation<'info> {
@@ -42,6 +57,21 @@ impl<'info> VaultUserOperation<'info> {
                 },
             ),
             amount,
+        )?;
+
+        start_reward(
+            CpiContext::new(
+                self.incentive_program.to_account_info(),
+                StartRewardRule {
+                    user: self.payer.to_account_info(),
+                    rule: self.rule.to_account_info(),
+                    reward_state: self.reward_state.to_account_info(),
+                    system_program: self.system_program.to_account_info(),
+                },
+            ),
+            StartRewardRuleArgs {
+                deposit_amount: amount,
+            },
         )?;
         Ok(())
     }

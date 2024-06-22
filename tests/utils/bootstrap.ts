@@ -1,14 +1,17 @@
 import * as anchor from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Incentive } from "../../target/types/incentive";
+import { SavingVault } from "../../target/types/saving_vault";
 
-const DEFAULT_MOCK_USER_BALANCE = 10 * LAMPORTS_PER_SOL;
-
-export function bootstrap<ProgramType extends anchor.Idl>(programKey: string) {
+export function bootstrap() {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
-  const program = anchor.workspace[programKey] as anchor.Program<ProgramType>;
+  const incentive = anchor.workspace.Incentive as anchor.Program<Incentive>;
+  const savingVault = anchor.workspace
+    .SavingVault as anchor.Program<SavingVault>;
+
   const provider = anchor.AnchorProvider.env();
   const connection = provider.connection;
   const admin = provider.wallet as NodeWallet;
@@ -51,12 +54,13 @@ export function bootstrap<ProgramType extends anchor.Idl>(programKey: string) {
     };
   };
   return {
-    program,
+    incentive,
+    savingVault,
     provider,
     connection,
     admin,
     airdrop,
     confirm,
-    generateUsers
+    generateUsers,
   };
 }

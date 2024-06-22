@@ -32,6 +32,11 @@ pub mod incentive {
         Ok(())
     }
 
+    pub fn initialize_reward_state(ctx: Context<InitializeRewardState>) -> Result<()> {
+        ctx.accounts.initialize_reward_state(&ctx.bumps)?;
+        Ok(())
+    }
+
     pub fn start_reward(ctx: Context<StartRewardRule>, args: StartRewardRuleArgs) -> Result<()> {
         ctx.accounts
             .start_reward_rule(args.deposit_amount, &ctx.bumps)?;
